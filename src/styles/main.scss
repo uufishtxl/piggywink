@@ -1,0 +1,111 @@
+@use './variables' as *;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  background-color: $color-bg-gray;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+input, textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.page-container {
+  min-height: 100vh;
+  padding-bottom: 60px; // 底部导航高度
+  background-color: $color-bg-gray;
+}
+
+.page-header {
+  @include flex-between;
+  padding: $spacing-md $spacing-lg;
+  background: $color-bg;
+  border-bottom: 1px solid $color-border;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  
+  &__back {
+    @include flex-center;
+    width: 32px;
+    height: 32px;
+    border-radius: $radius-full;
+    
+    &:active {
+      background: $color-bg-gray;
+    }
+  }
+  
+  &__title {
+    font-size: $font-size-md;
+    font-weight: $font-weight-semibold;
+  }
+  
+  &__action {
+    @include flex-center;
+    width: 32px;
+    height: 32px;
+  }
+}
+
+.card {
+  @include card;
+  padding: $spacing-lg;
+  margin: $spacing-md $spacing-lg;
+}
+
+.btn-primary {
+  @include flex-center;
+  padding: $spacing-sm $spacing-lg;
+  background: $color-primary;
+  color: white;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  
+  &:active {
+    background: $color-primary-dark;
+  }
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.btn-outline {
+  @include flex-center;
+  padding: $spacing-sm $spacing-lg;
+  background: transparent;
+  color: $color-primary;
+  border: 1px solid $color-primary;
+  border-radius: $radius-md;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  
+  &:active {
+    background: rgba($color-primary, 0.1);
+  }
+}

@@ -2,9 +2,14 @@ set dotenv-load := true
 
 set windows-shell := ["powershell.exe", "-NoLogo", "-Command"]
 
+# 编译 Docker 镜像
+build:
+    docker build -t my-pi-lab -f ../Dockerfile ..
+
 # 进入 Docker 沙盒环境
 lab:
     docker run -it --rm \
+        -p 5174:5174 \
         -v "${PWD}:/workspace" \
         -v "${HOME}/.pi:/root/.pi" \
         -v "C:\projects\my-tech-notebook:/vault" \
