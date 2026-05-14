@@ -10,20 +10,22 @@ interface IconItem {
 
 interface Props {
   items: IconItem[]
-  modelValue: string
+  modelValue: string | string[]
   label?: string
   columns?: number
   rows?: number
+  multiple?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   label: '',
   columns: 4,
   rows: 3,
+  multiple: false,
 })
 
 const emit = defineEmits<{
-  'update:modelValue': [id: string]
+  'update:modelValue': [id: string | string[]]
 }>()
 
 const pageSize = computed(() => props.columns * props.rows)
@@ -36,7 +38,22 @@ const pages = computed(() => {
   return result
 })
 
+// 判断是否选中（兼容单选和多选模式）
+const isSelected = (id: string): boolean => {
+  if (props.multiple) {
+    const values = props.modelValue as string[]
+    return values.includes(id)
+  }
+  return props.modelValue === id
+}
+
 const selectedPage = computed(() => {
+  if (props.multiple) {
+    const values = props.modelValue as string[]
+    if (values.length === 0) return 0
+    const idx = props.items.findIndex(item => item.id === values[0])
+    return idx >= 0 ? Math.floor(idx / pageSize.value) : 0
+  }
   const idx = props.items.findIndex(item => item.id === props.modelValue)
   return idx >= 0 ? Math.floor(idx / pageSize.value) : 0
 })
@@ -48,7 +65,20 @@ watch(selectedPage, (page) => {
 })
 
 function handleSelect(item: IconItem) {
-  if (!item.disabled) {
+  if (item.disabled) return
+  
+  if (props.multiple) {
+    const values = [...(props.modelValue as string[])]
+    const index = values.indexOf(item.id)
+    if (index > -1) {
+      // 已选中，取消选择
+      values.splice(index, 1)
+    } else {
+      // 未选中，添加选择
+      values.push(item.id)
+    }
+    emit('update:modelValue', values)
+  } else {
     emit('update:modelValue', item.id)
   }
 }
@@ -77,7 +107,7 @@ function handleSelect(item: IconItem) {
             :key="item.id"
             class="icon-carousel__item"
             :class="{
-              active: modelValue === item.id,
+              active: isSelected(item.id),
               disabled: item.disabled,
             }"
             @click="handleSelect(item)"
@@ -127,10 +157,14 @@ function handleSelect(item: IconItem) {
     border-radius: $radius-lg;
     border: 2px solid transparent;
     transition: all 0.2s;
+    filter: grayscale(100%);
+    opacity: 0.6;
 
     &.active {
       border-color: $color-primary;
       background: rgba($color-primary, 0.05);
+      filter: none;
+      opacity: 1;
     }
 
     &.disabled {

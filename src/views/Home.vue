@@ -1,70 +1,79 @@
 <script setup lang="ts">
 import RecordModal from '@/components/RecordModal.vue'
 import ExpenseList from '@/components/ExpenseList.vue'
+import SpendingSummaryCard from '@/components/SpendingSummaryCard.vue'
 import { ref, computed, onMounted, inject, watch, type ComputedRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getExpensesByMonth } from '@/services/expense'
+import { getBudgetsByMonth } from '@/services/budget'
+import { calculateBudgetSummary } from '@/services/budgetCalc'
 import type { Expense } from '@/types/expense'
+import type { Budget } from '@/types/budget'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const currentMonth = inject<ComputedRef<string>>('currentMonth')!
 
 const expenses = ref<Expense[]>([])
+const budgets = ref<Budget[]>([])
 const loading = ref(false)
+const showModal = ref(false)
+const showTopRecordBtn = ref(false)
+const recordBtnWrapper = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
 
-// 加载支出数据
-async function loadExpenses() {
+// 加载月度数据（支出 + 预算）
+async function loadMonthlyData() {
   if (!authStore.user || !currentMonth.value) return
-  
+
   loading.value = true
   try {
-    expenses.value = await getExpensesByMonth(authStore.user.uid, currentMonth.value)
+    const [expensesData, budgetsData] = await Promise.all([
+      getExpensesByMonth(authStore.user.uid, currentMonth.value),
+      getBudgetsByMonth(authStore.user.uid, currentMonth.value),
+    ])
+    expenses.value = expensesData
+    budgets.value = budgetsData
   } catch (e) {
-    console.error('加载支出失败:', e)
+    console.error('加载数据失败:', e)
   } finally {
     loading.value = false
   }
 }
 
-onMounted(loadExpenses)
-watch(currentMonth, loadExpenses)
+onMounted(() => {
+  loadMonthlyData()
+
+  observer = new IntersectionObserver(
+    ([entry]) => {
+      showTopRecordBtn.value = !entry.isIntersecting
+    },
+    { threshold: 0 }
+  )
+  if (recordBtnWrapper.value) {
+    observer.observe(recordBtnWrapper.value)
+  }
+})
+
+watch(currentMonth, loadMonthlyData)
 
 // 本月总花费
 const totalSpent = computed(() =>
   expenses.value.reduce((sum, e) => sum + e.amount, 0)
 )
 
-// Mock 预算（后续 Issue #7 实现）
-const mockBudget = {
-  total: 5000,
-  get remaining() { return this.total - totalSpent.value },
-  get dailyAvailable() {
-    const now = new Date()
-    const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate()
-    return daysLeft > 0 ? Math.round(this.remaining / daysLeft) : 0
-  },
-  get percentage() { return Math.round((totalSpent.value / this.total) * 100) },
-  get barColor() {
-    if (this.percentage < 60) return '#10B981'
-    if (this.percentage < 90) return '#F59E0B'
-    return '#EF4444'
-  }
-}
-
-function formatAmount(amount: number) {
-  return amount.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })
-}
-
-const showModal = ref(false)
+// 真实预算汇总
+const budgetSummary = computed(() =>
+  calculateBudgetSummary(budgets.value, expenses.value)
+)
 
 function openRecordModal() {
   showModal.value = true
 }
 
 function handleSaved() {
-  loadExpenses()
+  loadMonthlyData()
 }
 
 function handleEdit(expense: Expense) {
@@ -78,43 +87,31 @@ function handleEdit(expense: Expense) {
 
 <template>
   <div class="home">
-    <!-- 预算概览卡片 -->
-    <div class="card budget-card" @click="router.push('/budgets')">
-      <div class="budget-card__header">
-        <span class="budget-card__label">本月花费</span>
-        <span class="budget-card__amount">{{ formatAmount(totalSpent) }}</span>
-      </div>
-      <div class="budget-card__info">
-        <div class="budget-card__item">
-          <span class="budget-card__sublabel">预算剩余</span>
-          <span class="budget-card__value">{{ formatAmount(mockBudget.remaining) }}</span>
-        </div>
-        <div class="budget-card__item">
-          <span class="budget-card__sublabel">日均可消费</span>
-          <span class="budget-card__value">{{ formatAmount(mockBudget.dailyAvailable) }}</span>
-        </div>
-      </div>
-      <div class="budget-card__progress">
-        <div class="progress-bar">
-          <div
-            class="progress-bar__fill"
-            :style="{
-              width: mockBudget.percentage + '%',
-              backgroundColor: mockBudget.barColor
-            }"
-          ></div>
-        </div>
-        <span class="progress-bar__label">{{ mockBudget.percentage }}%</span>
-      </div>
+    <!-- 顶部备用记一笔按钮 -->
+    <div v-if="showTopRecordBtn" class="top-record-btn">
+      <button class="record-btn" @click="openRecordModal">记一笔</button>
     </div>
 
-    <!-- 记一笔按钮 sticky -->
-    <div class="record-btn-wrapper">
+    <!-- 预算概览卡片 -->
+    <SpendingSummaryCard
+      label="本月花费"
+      :amount="totalSpent"
+      :percentage="budgetSummary.percentage"
+      :status="budgetSummary.status"
+      :spent="totalSpent"
+      :remaining="budgetSummary.totalRemaining"
+      :daily-available="budgetSummary.dailyAvailable"
+      style="cursor: pointer"
+      @click="router.push('/budgets')"
+    />
+
+    <!-- 记一笔按钮 -->
+    <div ref="recordBtnWrapper" class="record-btn-wrapper">
       <button class="record-btn" @click="openRecordModal">
         记一笔
       </button>
     </div>
-    
+
     <RecordModal
       v-model:visible="showModal"
       @saved="handleSaved"
@@ -137,85 +134,16 @@ function handleEdit(expense: Expense) {
   padding-bottom: $spacing-xl;
 }
 
-.budget-card {
-  cursor: pointer;
-  transition: background 0.2s;
-
-  &:active {
-    background: #f0f0f0;
-  }
-  &__header {
-    @include flex-between;
-    margin-bottom: $spacing-md;
-  }
-
-  &__label {
-    font-size: $font-size-sm;
-    color: $color-text-secondary;
-  }
-
-  &__amount {
-    font-size: $font-size-xl;
-    font-weight: $font-weight-bold;
-    color: $color-text-primary;
-  }
-
-  &__info {
-    @include flex-between;
-    margin-bottom: $spacing-md;
-  }
-
-  &__item {
-    flex: 1;
-  }
-
-  &__sublabel {
-    font-size: $font-size-xs;
-    color: $color-text-secondary;
-    display: block;
-    margin-bottom: 4px;
-  }
-
-  &__value {
-    font-size: $font-size-md;
-    font-weight: $font-weight-semibold;
-    color: $color-text-primary;
-  }
-
-  &__progress {
-    @include flex-between;
-    align-items: center;
-  }
-}
-
-.progress-bar {
-  flex: 1;
-  height: 8px;
+.top-record-btn {
+  position: sticky;
+  top: -12px;
+  z-index: 50;
+  padding: 0 $spacing-lg;
   background: $color-bg-gray;
-  border-radius: $radius-full;
-  margin-right: $spacing-sm;
-  overflow: hidden;
-
-  &__fill {
-    height: 100%;
-    border-radius: $radius-full;
-    transition: width 0.3s ease;
-  }
-
-  &__label {
-    font-size: $font-size-xs;
-    color: $color-text-secondary;
-    min-width: 36px;
-    text-align: right;
-  }
 }
 
 .record-btn-wrapper {
-  position: sticky;
-  top: 48px;
-  z-index: 50;
   padding: $spacing-md $spacing-lg;
-  background: $color-bg-gray;
 }
 
 .record-btn {

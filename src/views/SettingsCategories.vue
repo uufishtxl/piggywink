@@ -114,8 +114,8 @@ async function handleSave() {
       ElMessage.success('已添加')
     }
     dialogVisible.value = false
-  } catch {
-    ElMessage.error('保存失败')
+  } catch (e: any) {
+    ElMessage.error(e.message || '保存失败')
   }
 }
 
@@ -157,7 +157,7 @@ async function handleDelete(category: Category) {
           <div class="category-item__name">
             {{ cat.name }}
             <span v-if="cat.isSystem" class="badge badge--system">系统</span>
-            <span v-if="cat.isSafe" class="badge badge--safe">常统计</span>
+            <span v-if="cat.isSafe" class="badge badge--safe">常规</span>
           </div>
         </div>
         <div class="category-item__actions">
@@ -202,9 +202,9 @@ async function handleDelete(category: Category) {
           <ElInput v-model="formName" placeholder="分类名称" maxlength="20" />
         </div>
         <div class="form-item form-item--switch">
-          <label>始终统计</label>
+          <label>常规类别</label>
           <ElSwitch v-model="formIsSafe" />
-          <span class="form-item__hint">isSafe = true 时始终计入统计</span>
+          <span class="form-item__hint">常规类别始终计入统计，非常规类别可手动排除</span>
         </div>
       </div>
       <template #footer>

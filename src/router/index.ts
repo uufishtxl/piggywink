@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
-const routes: RouteRecordRaw[] = [
+export const routes: RouteRecordRaw[] = [
   {
     path: '/login',
     name: 'Login',
@@ -38,6 +38,11 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/SettingsCategories.vue')
   },
   {
+    path: '/settings/notifications',
+    name: 'NotificationsSettings',
+    component: () => import('@/views/NotificationsSettings.vue')
+  },
+  {
     path: '/budgets',
     name: 'Budgets',
     component: () => import('@/views/Budgets.vue')
@@ -56,6 +61,11 @@ const routes: RouteRecordRaw[] = [
     path: '/expense/:id/edit',
     name: 'ExpenseEdit',
     component: () => import('@/views/ExpenseEdit.vue')
+  },
+  {
+    path: '/stats/compare',
+    name: 'StatsCompare',
+    component: () => import('@/views/StatsCompare.vue')
   }
 ]
 

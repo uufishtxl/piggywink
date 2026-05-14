@@ -44,6 +44,15 @@ const totalAmount = computed(() =>
   editableItems.value.reduce((sum, item) => sum + item.amount, 0)
 )
 
+// 处理键盘事件
+function handleKeydown(e: KeyboardEvent) {
+  // Ctrl+Enter 或 Cmd+Enter 触发解析
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault()
+    handleParse()
+  }
+}
+
 // 解析输入
 async function handleParse() {
   if (!inputText.value.trim()) {
@@ -185,7 +194,7 @@ function handleClose() {
           class="record-textarea"
           placeholder="说点什么... 如：午餐星巴克48元"
           rows="3"
-          @keydown.enter.prevent="handleParse"
+          @keydown="handleKeydown"
         />
         <ElButton
           type="primary"

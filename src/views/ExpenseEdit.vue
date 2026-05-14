@@ -15,7 +15,7 @@ const categoriesStore = useCategoriesStore()
 const amount = ref<number | string>(0)
 const description = ref('')
 const selectedCategoryId = ref('')
-const selectedDate = ref(new Date())
+const selectedDate = ref('')
 const loading = ref(false)
 
 const expenseId = computed(() => route.params.id as string)
@@ -31,7 +31,7 @@ onMounted(async () => {
       amount.value = expense.amount
       description.value = expense.description
       selectedCategoryId.value = expense.categoryId
-      selectedDate.value = expense.date
+      selectedDate.value = expense.date.toISOString().slice(0, 10)
     } else {
       ElMessage.warning('未找到支出数据')
       router.back()
@@ -79,7 +79,7 @@ async function handleSave() {
       categoryId: selectedCategoryId.value,
       amount: num,
       description: description.value.trim(),
-      date: selectedDate.value,
+      date: new Date(selectedDate.value),
     })
     ElMessage.success('已更新')
     router.back()

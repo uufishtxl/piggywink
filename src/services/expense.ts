@@ -1,6 +1,8 @@
 import { collection, addDoc, Timestamp, getDocs, getDoc, doc, updateDoc, deleteDoc } from 'firebase/firestore'
 import { db } from '@/services/firebase'
 import type { ParsedExpense, ExpenseData, Expense } from '@/types/expense'
+import { updateExpenseMeta } from '@/services/expenseMeta'
+import { updateMonthlyStats } from '@/services/monthlyStats'
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY
 const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent'
@@ -94,6 +96,17 @@ export async function saveExpense({
     month: dateStr,
     createdAt: Timestamp.now(),
   })
+  
+  // 异步更新支出元数据，不阻塞主流程
+  updateExpenseMeta(userId, dateStr).catch(err => {
+    console.error('Failed to update expense meta:', err)
+  })
+  
+  // 异步更新预聚合数据，不阻塞主流程
+  updateMonthlyStats(userId, dateStr).catch(err => {
+    console.error('Failed to update monthly stats:', err)
+  })
+  
   return docRef.id
 }
 
@@ -172,6 +185,19 @@ export async function updateExpense(
     updateData.month = data.date.toISOString().slice(0, 7)
   }
   await updateDoc(expenseRef, updateData)
+  
+  // 异步更新支出元数据，不阻塞主流程
+  if (data.date) {
+    const month = data.date.toISOString().slice(0, 7)
+    updateExpenseMeta(userId, month).catch(err => {
+      console.error('Failed to update expense meta:', err)
+    })
+    
+    // 异步更新预聚合数据，不阻塞主流程
+    updateMonthlyStats(userId, month).catch(err => {
+      console.error('Failed to update monthly stats:', err)
+    })
+  }
 }
 
 // 删除支出记录
@@ -179,6 +205,17 @@ export async function deleteExpense(
   userId: string,
   expenseId: string
 ): Promise<void> {
+  // 先获取支出记录，以便获取月份信息
+  const expense = await getExpenseById(userId, expenseId)
+  
   const expenseRef = doc(db, 'users', userId, 'expenses', expenseId)
   await deleteDoc(expenseRef)
+  
+  // 异步更新支出元数据，不阻塞主流程
+  if (expense) {
+    const month = expense.date.toISOString().slice(0, 7)
+    updateExpenseMeta(userId, month).catch(err => {
+      console.error('Failed to update expense meta:', err)
+    })
+  }
 }

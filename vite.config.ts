@@ -73,5 +73,10 @@ export default defineConfig({
         additionalData: `@use "@/styles/variables" as *;`
       }
     }
+  },
+  test: {
+    environment: 'happy-dom',
+    globals: true,
+    setupFiles: ['./src/test-setup.ts'],
   }
 })

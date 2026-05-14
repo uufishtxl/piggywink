@@ -3,9 +3,10 @@ import { RouterView, useRouter } from 'vue-router'
 import { computed, ref, watch, provide } from 'vue'
 import { ElConfigProvider } from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
-import { ArrowLeft, Setting, HomeFilled, PieChart, Wallet, Plus } from '@element-plus/icons-vue'
+import { ArrowLeft, Setting, HomeFilled, PieChart, Wallet, Plus, Calendar } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCategoriesStore } from '@/stores/categories'
+import MonthPicker from '@/components/MonthPicker.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -20,11 +21,18 @@ const isSettingsSubRoute = computed(() =>
 )
 const isSubRoute = computed(() => 
   isSettingsSubRoute.value || 
-  ['Budgets', 'BudgetAdd', 'BudgetDetail', 'ExpenseEdit', 'AssetTrends'].includes(currentRoute.value as string)
+  ['Budgets', 'BudgetAdd', 'BudgetDetail', 'ExpenseEdit', 'AssetTrends', 'StatsCompare'].includes(currentRoute.value as string)
 )
 
 // 当前选择的月份
 const selectedMonth = ref(new Date())
+
+// StatsCompare 相关数据
+const statsCompareMonth = ref(new Date().toISOString().slice(0, 7))
+const statsCompareMeta = ref<{ earliestMonth: string; latestMonth: string } | null>(null)
+
+provide('statsCompareMonth', statsCompareMonth)
+provide('statsCompareMeta', statsCompareMeta)
 
 // 用户登录后订阅分类
 watch(() => authStore.user, (user) => {
@@ -64,6 +72,13 @@ function openAddCategory() {
 
 function goToAddBudget() {
   router.push('/budgets/add')
+}
+
+// StatsCompare 页面月份选择器 ref
+const statsCompareMonthPickerRef = ref<InstanceType<typeof MonthPicker> | null>(null)
+
+function openStatsCompareMonthPicker() {
+  statsCompareMonthPickerRef.value?.open()
 }
 </script>
 
@@ -105,13 +120,24 @@ function goToAddBudget() {
           <span v-else-if="currentRoute === 'BudgetDetail'" class="header-title">预算详情</span>
           <span v-else-if="currentRoute === 'ExpenseEdit'" class="header-title">编辑支出</span>
           <span v-else-if="currentRoute === 'AssetTrends'" class="header-title">资产趋势</span>
+          <span v-else-if="currentRoute === 'StatsCompare'" class="header-title">对比统计结果</span>
         </div>
         <div class="app-header__right">
-          <el-button size="large" v-if="currentRoute === 'SettingsCategories'" :icon="Plus" link @click="openAddCategory" />
+          <template v-if="currentRoute === 'StatsCompare'">
+            <el-button size="large" :icon="Calendar" link @click="openStatsCompareMonthPicker" />
+          </template>
+          <el-button size="large" v-else-if="currentRoute === 'SettingsCategories'" :icon="Plus" link @click="openAddCategory" />
           <el-button size="large" v-else-if="currentRoute === 'Budgets'" :icon="Plus" link @click="goToAddBudget" />
           <el-button size="large" v-else :icon="Setting" link @click="goToSettings" />
         </div>
       </header>
+
+      <!-- StatsCompare 月份选择器（隐藏，外部触发） -->
+      <MonthPicker
+        v-if="currentRoute === 'StatsCompare'"
+        ref="statsCompareMonthPickerRef"
+        v-model="statsCompareMonth"
+      />
 
       <main class="app-content" :class="{ 'app-content--no-nav': isSettingsRoute }">
         <RouterView />
