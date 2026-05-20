@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch } from 'vue'
 import type { Ref } from 'vue'
 
 const props = defineProps<{
@@ -55,24 +55,25 @@ function handleCalendarChange(date: Date | null) {
 
 // 暴露 open 方法，供外部调用打开日期选择器
 defineExpose({
-  open: async () => {
-    await nextTick()
-    const picker = datePickerRef.value
-    if (picker) {
-      // Element Plus 的 el-date-picker 有 handleOpen 方法
-      if (typeof picker.handleOpen === 'function') {
-        picker.handleOpen()
-      } else {
-        // 备用方案：查找内部 input 元素并触发 click
-        const el = picker.$el || picker
-        if (el && el.querySelector) {
-          const input = el.querySelector('.el-input__wrapper') as HTMLElement
-          if (input) {
-            input.click()
+  open: () => {
+    // 使用 requestAnimationFrame 延迟到下一帧，
+    // 避免触发按钮的 click 事件冒泡被 onClickOutside 捕获后立即关闭弹窗
+    requestAnimationFrame(() => {
+      const picker = datePickerRef.value
+      if (picker) {
+        if (typeof picker.handleOpen === 'function') {
+          picker.handleOpen()
+        } else {
+          const el = picker.$el || picker
+          if (el && el.querySelector) {
+            const input = el.querySelector('.el-input__wrapper') as HTMLElement
+            if (input) {
+              input.click()
+            }
           }
         }
       }
-    }
+    })
   },
 })
 
@@ -81,9 +82,9 @@ const datePickerRef: Ref<any> = ref(null)
 
 <style lang="scss" scoped>
 .month-picker-hidden {
-  position: fixed !important;
-  top: -9999px !important;
-  left: -9999px !important;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
   width: 0 !important;
   height: 0 !important;
   overflow: hidden !important;
@@ -95,9 +96,9 @@ const datePickerRef: Ref<any> = ref(null)
 <style lang="scss">
 // 非 scoped：覆盖 Element Plus date-picker 样式
 .month-picker-hidden.el-date-editor {
-  position: fixed !important;
-  top: -9999px !important;
-  left: -9999px !important;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
   width: 0 !important;
   height: 0 !important;
   overflow: hidden !important;

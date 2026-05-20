@@ -12,7 +12,7 @@ const COLORS = [
 
 // 柱状图颜色
 const BAR_COLORS = {
-  current: '#1890FF',  // 本月深蓝
+  current: '#10B981',  // 本月深蓝
   previous: '#BAE7FF', // 上月浅蓝
 }
 
@@ -147,7 +147,7 @@ export interface BarChartDataItem {
  */
 export function buildBarChartConfig(data: BarChartDataItem[]): BarChartConfig {
   const labels = data.map(item => item.categoryName)
-  
+
   const chartData = {
     labels,
     datasets: [
@@ -167,7 +167,7 @@ export function buildBarChartConfig(data: BarChartDataItem[]): BarChartConfig {
       },
     ],
   }
-  
+
   const chartOptions = {
     indexAxis: 'y' as const,
     responsive: true,
@@ -216,6 +216,6 @@ export function buildBarChartConfig(data: BarChartDataItem[]): BarChartConfig {
       },
     },
   }
-  
+
   return { chartData, chartOptions }
 }

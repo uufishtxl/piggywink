@@ -185,6 +185,7 @@ onMounted(loadAccounts)
 </template>
 
 <style lang="scss" scoped>
+@use 'sass:color';
 @use '@/styles/variables' as *;
 
 .assets {
@@ -267,11 +268,11 @@ onMounted(loadAccounts)
   justify-content: center;
 
   &:hover {
-    background: darken($color-primary, 10%);
+    background: color.adjust($color-primary, $lightness: -10%);
   }
 
   &:active {
-    background: darken($color-primary, 20%);
+    background: color.adjust($color-primary, $lightness: -20%);
   }
 }
 </style>

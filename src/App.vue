@@ -21,7 +21,23 @@ const isSettingsSubRoute = computed(() =>
 )
 const isSubRoute = computed(() => 
   isSettingsSubRoute.value || 
-  ['Budgets', 'BudgetAdd', 'BudgetDetail', 'ExpenseEdit', 'AssetTrends', 'StatsCompare'].includes(currentRoute.value as string)
+  isStatsSubRoute.value ||
+  isAssetsSubRoute.value ||
+  ['Budgets', 'BudgetAdd', 'BudgetDetail', 'ExpenseEdit'].includes(currentRoute.value as string)
+)
+
+// 判断是否为统计子页面
+const isStatsSubRoute = computed(() => 
+  typeof currentRoute.value === 'string' && 
+  currentRoute.value.startsWith('Stats') && 
+  currentRoute.value !== 'Stats'
+)
+
+// 判断是否为资产子页面
+const isAssetsSubRoute = computed(() => 
+  typeof currentRoute.value === 'string' && 
+  currentRoute.value.startsWith('Asset') && 
+  currentRoute.value !== 'Assets'
 )
 
 // 当前选择的月份
@@ -125,19 +141,16 @@ function openStatsCompareMonthPicker() {
         <div class="app-header__right">
           <template v-if="currentRoute === 'StatsCompare'">
             <el-button size="large" :icon="Calendar" link @click="openStatsCompareMonthPicker" />
+            <MonthPicker
+              ref="statsCompareMonthPickerRef"
+              v-model="statsCompareMonth"
+            />
           </template>
           <el-button size="large" v-else-if="currentRoute === 'SettingsCategories'" :icon="Plus" link @click="openAddCategory" />
           <el-button size="large" v-else-if="currentRoute === 'Budgets'" :icon="Plus" link @click="goToAddBudget" />
           <el-button size="large" v-else :icon="Setting" link @click="goToSettings" />
         </div>
       </header>
-
-      <!-- StatsCompare 月份选择器（隐藏，外部触发） -->
-      <MonthPicker
-        v-if="currentRoute === 'StatsCompare'"
-        ref="statsCompareMonthPickerRef"
-        v-model="statsCompareMonth"
-      />
 
       <main class="app-content" :class="{ 'app-content--no-nav': isSettingsRoute }">
         <RouterView />
@@ -154,7 +167,7 @@ function openStatsCompareMonthPicker() {
         </button>
         <button 
           class="app-nav__item" 
-          :class="{ active: currentRoute === 'Stats' }"
+          :class="{ active: currentRoute === 'Stats' || currentRoute === 'StatsCompare' }"
           @click="navigateTo('Stats')"
         >
           <el-icon :size="20"><PieChart /></el-icon>
@@ -162,7 +175,7 @@ function openStatsCompareMonthPicker() {
         </button>
         <button 
           class="app-nav__item" 
-          :class="{ active: currentRoute === 'Assets' }"
+          :class="{ active: currentRoute === 'Assets' || currentRoute === 'AssetTrends' }"
           @click="navigateTo('Assets')"
         >
           <el-icon :size="20"><Wallet /></el-icon>
@@ -225,6 +238,7 @@ function openStatsCompareMonthPicker() {
 
   &__right {
     justify-content: flex-end;
+    position: relative;
   }
 
   &__center {

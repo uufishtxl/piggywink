@@ -78,10 +78,17 @@ export async function getCompareData(
     ...Object.keys(previousStats.categories),
   ])
 
-  // 过滤选中的分类
-  const filteredCategoryIds = selectedCategoryIds.length > 0
-    ? [...allCategoryIds].filter(id => selectedCategoryIds.includes(id))
-    : [...allCategoryIds]
+  // 分类列表（用于C/D区域图表和表格）
+  // 必须包含：所有常规类别(isSafe=true) + 选中的非常规类别(isSafe=false)
+  const safeCategoryIds = categories.filter(c => c.isSafe).map(c => c.id)
+  const selectedUnsafeIds = categories
+    .filter(c => !c.isSafe && selectedCategoryIds.includes(c.id))
+    .map(c => c.id)
+  
+  // 过滤有实际数据的分类
+  const filteredCategoryIds = [...safeCategoryIds, ...selectedUnsafeIds].filter(id => 
+    currentStats.categories[id] || previousStats.categories[id]
+  )
 
   // 构建分类对比数据
   const categoriesData: CompareCategoryData[] = filteredCategoryIds.map(categoryId => {
@@ -113,9 +120,36 @@ export async function getCompareData(
   // 按本月支出降序排列
   categoriesData.sort((a, b) => b.currentAmount - a.currentAmount)
 
+  // B区域总支出计算：只统计常规类别(isSafe=true) + 选中的非常规类别
+  const bAreaCategoryIds = new Set<string>()
+  
+  // 添加所有 isSafe=true 的分类
+  for (const cat of categories) {
+    if (cat.isSafe) {
+      bAreaCategoryIds.add(cat.id)
+    }
+  }
+  
+  // 如果有选中的分类，添加其中 isSafe=false 的分类
+  if (selectedCategoryIds.length > 0) {
+    for (const catId of selectedCategoryIds) {
+      const cat = categoryMap.get(catId)
+      if (cat && !cat.isSafe) {
+        bAreaCategoryIds.add(catId)
+      }
+    }
+  }
+
+  // 计算B区域的总支出
+  let totalCurrent = 0
+  let totalPrevious = 0
+  
+  for (const categoryId of bAreaCategoryIds) {
+    totalCurrent += currentStats.categories[categoryId]?.totalAmount || 0
+    totalPrevious += previousStats.categories[categoryId]?.totalAmount || 0
+  }
+
   // 计算总支出变化
-  const totalCurrent = currentStats.totalAmount
-  const totalPrevious = previousStats.totalAmount
   let totalChangePercent = 0
   if (totalPrevious > 0) {
     totalChangePercent = ((totalCurrent - totalPrevious) / totalPrevious) * 100

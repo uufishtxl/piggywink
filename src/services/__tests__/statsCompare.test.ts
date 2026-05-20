@@ -47,9 +47,11 @@ describe('getCompareData', () => {
 
     expect(result.currentMonth).toBe('2026-05')
     expect(result.previousMonth).toBe('2026-04')
-    expect(result.totalCurrent).toBe(300)
-    expect(result.totalPrevious).toBe(240)
-    expect(result.categories).toHaveLength(2)
+    // B区域只统计 isSafe=true 的分类 (cat1=100, cat2=200但isSafe=false不计入)
+    expect(result.totalCurrent).toBe(100)
+    expect(result.totalPrevious).toBe(80)
+    // C/D区域只显示常规类别(isSafe=true)，cat2(isSafe=false)未被选中所以不显示
+    expect(result.categories).toHaveLength(1)
   })
 
   it('浮动值计算正确（增长）', async () => {
@@ -150,10 +152,9 @@ describe('getCompareData', () => {
 
     const result = await getCompareData('user1', '2026-05', [], mockCategories, [])
 
-    // 应该按本月支出降序：cat2(300) > cat3(200) > cat1(100)
-    expect(result.categories[0].categoryId).toBe('cat2')
-    expect(result.categories[1].categoryId).toBe('cat3')
-    expect(result.categories[2].categoryId).toBe('cat1')
+    // 只显示常规类别：cat3(200) > cat1(100)，cat2(isSafe=false)未被选中不显示
+    expect(result.categories[0].categoryId).toBe('cat3')
+    expect(result.categories[1].categoryId).toBe('cat1')
   })
 
   it('类别过滤逻辑正确', async () => {
@@ -175,14 +176,14 @@ describe('getCompareData', () => {
       }
     })
 
-    // 只选择cat1和cat2
-    const result = await getCompareData('user1', '2026-05', ['cat1', 'cat2'], mockCategories, [])
+    // 选择cat2（非常规类别）
+    const result = await getCompareData('user1', '2026-05', ['cat2'], mockCategories, [])
 
-    // 应该只有2个分类
-    expect(result.categories).toHaveLength(2)
+    // 应该有3个分类：cat1(isSafe=true) + cat2(选中的非常规) + cat3(isSafe=true)
+    expect(result.categories).toHaveLength(3)
     expect(result.categories.find(c => c.categoryId === 'cat1')).toBeDefined()
     expect(result.categories.find(c => c.categoryId === 'cat2')).toBeDefined()
-    expect(result.categories.find(c => c.categoryId === 'cat3')).toBeUndefined()
+    expect(result.categories.find(c => c.categoryId === 'cat3')).toBeDefined()
   })
 
   it('预算数据正确获取和显示', async () => {
@@ -206,11 +207,141 @@ describe('getCompareData', () => {
 
     const result = await getCompareData('user1', '2026-05', [], mockCategories, mockBudgets)
 
-    // cat1有预算800，cat2有预算400
+    // 只显示常规类别，cat1有预算800，cat2(isSafe=false)未被选中不显示
     const cat1 = result.categories.find(c => c.categoryId === 'cat1')
-    const cat2 = result.categories.find(c => c.categoryId === 'cat2')
     expect(cat1?.budget).toBe(800)
-    expect(cat2?.budget).toBe(400)
+  })
+
+  // ========== B区域浮动金额计算逻辑测试 ==========
+  // B区域只统计：常规类别(isSafe=true) + 选中的非常规类别(isSafe=false)
+
+  it('B区域只统计常规类别(isSafe=true)的支出', async () => {
+    // mockCategories: cat1(isSafe=true), cat2(isSafe=false), cat3(isSafe=true)
+    vi.mocked(getMonthlyStats).mockImplementation(async (userId, month) => {
+      if (month === '2026-05') {
+        return {
+          month: '2026-05',
+          // cat1(餐饮, isSafe=true): 100, cat2(购物, isSafe=false): 200, cat3(交通, isSafe=true): 150
+          categories: { cat1: { totalAmount: 100 }, cat2: { totalAmount: 200 }, cat3: { totalAmount: 150 } },
+          totalAmount: 450, // 总支出 = 100 + 200 + 150
+          updatedAt: new Date(),
+        }
+      } else {
+        return {
+          month: '2026-04',
+          categories: { cat1: { totalAmount: 80 }, cat2: { totalAmount: 160 }, cat3: { totalAmount: 120 } },
+          totalAmount: 360, // 总支出 = 80 + 160 + 120
+          updatedAt: new Date(),
+        }
+      }
+    })
+
+    // 不选择任何非常规类别，所以只统计 isSafe=true 的分类
+    const result = await getCompareData('user1', '2026-05', [], mockCategories, [])
+
+    // B区域应该只统计 cat1(100) + cat3(150) = 250
+    // 而不是所有分类的 450
+    expect(result.totalCurrent).toBe(250) // 100(cat1) + 150(cat3)
+    expect(result.totalPrevious).toBe(200) // 80(cat1) + 120(cat3)
+    // 浮动百分比: (250-200)/200 = 25%
+    expect(result.totalChangePercent).toBe(25)
+  })
+
+  it('B区域统计常规类别 + 选中的非常规类别的支出', async () => {
+    vi.mocked(getMonthlyStats).mockImplementation(async (userId, month) => {
+      if (month === '2026-05') {
+        return {
+          month: '2026-05',
+          categories: { cat1: { totalAmount: 100 }, cat2: { totalAmount: 200 }, cat3: { totalAmount: 150 } },
+          totalAmount: 450,
+          updatedAt: new Date(),
+        }
+      } else {
+        return {
+          month: '2026-04',
+          categories: { cat1: { totalAmount: 80 }, cat2: { totalAmount: 160 }, cat3: { totalAmount: 120 } },
+          totalAmount: 360,
+          updatedAt: new Date(),
+        }
+      }
+    })
+
+    // 选中 cat2 (isSafe=false)，此时B区域统计: cat1(isSafe=true) + cat2(选中) + cat3(isSafe=true)
+    const result = await getCompareData('user1', '2026-05', ['cat2'], mockCategories, [])
+
+    // B区域应该统计所有分类: cat1(100) + cat2(200) + cat3(150) = 450
+    expect(result.totalCurrent).toBe(450) // 所有分类
+    expect(result.totalPrevious).toBe(360) // 所有分类
+    expect(result.totalChangePercent).toBe(25) // (450-360)/360 = 25%
+  })
+
+  it('B区域不包含未选中的非常规类别', async () => {
+    vi.mocked(getMonthlyStats).mockImplementation(async (userId, month) => {
+      if (month === '2026-05') {
+        return {
+          month: '2026-05',
+          categories: { cat1: { totalAmount: 100 }, cat2: { totalAmount: 200 }, cat3: { totalAmount: 150 }, cat4: { totalAmount: 300 } },
+          totalAmount: 750,
+          updatedAt: new Date(),
+        }
+      } else {
+        return {
+          month: '2026-04',
+          categories: { cat1: { totalAmount: 80 }, cat2: { totalAmount: 160 }, cat3: { totalAmount: 120 }, cat4: { totalAmount: 240 } },
+          totalAmount: 600,
+          updatedAt: new Date(),
+        }
+      }
+    })
+
+    // 定义新的分类列表，其中 cat4 是非常规类别
+    const categoriesWithCat4 = [
+      { id: 'cat1', name: '餐饮', icon: '🍜', isSafe: true },
+      { id: 'cat2', name: '购物', icon: '🛒', isSafe: false },
+      { id: 'cat3', name: '交通', icon: '🚇', isSafe: true },
+      { id: 'cat4', name: '娱乐', icon: '🎮', isSafe: false }, // isSafe=false
+    ]
+
+    // 不选择任何分类，只统计 isSafe=true 的分类
+    const result = await getCompareData('user1', '2026-05', [], categoriesWithCat4, [])
+
+    // B区域应该只统计 cat1(100) + cat3(150) = 250，不包含 cat2 和 cat4
+    expect(result.totalCurrent).toBe(250)
+    expect(result.totalPrevious).toBe(200)
+  })
+
+  it('B区域所有分类都是非常规类别时，只统计选中的', async () => {
+    vi.mocked(getMonthlyStats).mockImplementation(async (userId, month) => {
+      if (month === '2026-05') {
+        return {
+          month: '2026-05',
+          categories: { cat1: { totalAmount: 100 }, cat2: { totalAmount: 200 } },
+          totalAmount: 300,
+          updatedAt: new Date(),
+        }
+      } else {
+        return {
+          month: '2026-04',
+          categories: { cat1: { totalAmount: 80 }, cat2: { totalAmount: 160 } },
+          totalAmount: 240,
+          updatedAt: new Date(),
+        }
+      }
+    })
+
+    // 所有分类都是 isSafe=false
+    const allUnsafeCategories = [
+      { id: 'cat1', name: '餐饮', icon: '🍜', isSafe: false },
+      { id: 'cat2', name: '购物', icon: '🛒', isSafe: false },
+    ]
+
+    // 选中 cat1，不选择 cat2
+    const result = await getCompareData('user1', '2026-05', ['cat1'], allUnsafeCategories, [])
+
+    // B区域只统计选中的 cat1
+    expect(result.totalCurrent).toBe(100)
+    expect(result.totalPrevious).toBe(80)
+    expect(result.totalChangePercent).toBe(25)
   })
 })
 

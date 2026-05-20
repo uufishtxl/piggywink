@@ -67,7 +67,7 @@ $font-weight-bold: 700;
 
 @mixin card {
   background: $color-bg;
-  border-radius: $radius-lg;
+  border-radius: $radius-sm;
   box-shadow: $shadow-md;
 }
 

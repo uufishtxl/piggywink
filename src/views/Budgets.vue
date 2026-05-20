@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Sort, Top, Bottom } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useCategoriesStore } from '@/stores/categories'
 import { getBudgetsByMonth, deleteBudget } from '@/services/budget'
@@ -19,6 +20,10 @@ const categoriesStore = useCategoriesStore()
 const budgets = ref<Budget[]>([])
 const expenses = ref<Expense[]>([])
 const loading = ref(false)
+
+// 排序状态
+const sortBy = ref<'amount' | 'percentage'>('percentage')
+const sortOrder = ref<'asc' | 'desc'>('desc')
 
 // 滑动状态
 const swipedId = ref<string | null>(null)
@@ -70,12 +75,39 @@ interface BudgetItem {
   spentAmount: number
   percentage: number
   status: 'safe' | 'warning' | 'danger'
+  badgeType: 'success' | 'warning' | 'danger'
+  badgeLabel: string
 }
 
 const budgetItems = computed<BudgetItem[]>(() => {
+  // 计算本月已过去比例
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const today = now.getDate()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const monthProgress = Math.round((today / daysInMonth) * 100)
+
   return budgets.value.map(b => {
     const cat = categoriesStore.categories.find(c => c.id === b.categoryId)
     const progress = calculateCategoryProgress(b, expenses.value)
+    
+    // 计算标签
+    let badgeType: 'success' | 'warning' | 'danger' = 'success'
+    let badgeLabel = '预算充足'
+    
+    const diff = progress.percentage - monthProgress
+    if (diff > 10) {
+      badgeType = 'danger'
+      badgeLabel = '进度过快'
+    } else if (diff < -10) {
+      badgeType = 'success'
+      badgeLabel = '预算充足'
+    } else {
+      badgeType = 'warning'
+      badgeLabel = '正常'
+    }
+    
     return {
       id: b.id,
       categoryId: b.categoryId,
@@ -85,9 +117,28 @@ const budgetItems = computed<BudgetItem[]>(() => {
       spentAmount: progress.spentAmount,
       percentage: progress.percentage,
       status: progress.status,
+      badgeType,
+      badgeLabel,
     }
   })
 })
+
+// 排序后的预算列表
+const sortedBudgetItems = computed(() => {
+  const items = [...budgetItems.value]
+  items.sort((a, b) => {
+    const key = sortBy.value === 'amount' ? 'budgetAmount' : 'percentage'
+    const aVal = a[key]
+    const bVal = b[key]
+    return sortOrder.value === 'asc' ? aVal - bVal : bVal - aVal
+  })
+  return items
+})
+
+// 切换排序方向
+function toggleSortOrder() {
+  sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+}
 
 // 触摸事件处理
 function onTouchStart(id: string, e: TouchEvent) {
@@ -171,11 +222,36 @@ function getStatusColor(status: string) {
 
     <!-- B区：分类预算列表 -->
     <div class="budget-list" @click="closeSwipe">
+      <div class="budget-list__sort">
+        <div class="budget-list__sort--method">
+          <el-icon><Sort /></el-icon>
+        <button 
+          class="sort-btn" 
+          :class="{ active: sortBy === 'amount' }"
+          @click="sortBy = 'amount'"
+        >
+          花费金额
+        </button>
+        <button 
+          class="sort-btn" 
+          :class="{ active: sortBy === 'percentage' }"
+          @click="sortBy = 'percentage'"
+        >
+          花费比例
+        </button>
+        </div>
+        <button class="sort-btn sort-btn--order" @click="toggleSortOrder">
+          <el-icon>
+            <Top v-if="sortOrder === 'asc'" />
+            <Bottom v-else />
+          </el-icon>
+        </button>
+      </div>
       <div v-if="loading" class="loading">加载中...</div>
-      <div v-else-if="!budgetItems.length" class="empty">暂无预算设置</div>
+      <div v-else-if="!sortedBudgetItems.length" class="empty">暂无预算设置</div>
       <div v-else class="budget-list__items">
         <div
-          v-for="item in budgetItems"
+          v-for="item in sortedBudgetItems"
           :key="item.id"
           class="budget-item-wrapper"
           @touchstart="onTouchStart(item.id, $event)"
@@ -190,6 +266,14 @@ function getStatusColor(status: string) {
             <div class="budget-item__header">
               <div class="budget-item__icon">{{ item.categoryIcon }}</div>
               <span class="budget-item__name">{{ item.categoryName }}</span>
+              <div class="budget-item__badges">
+                <el-tag :type="item.badgeType" size="small" effect="dark">
+                  {{ item.percentage }}%
+                </el-tag>
+                <el-tag :type="item.badgeType" size="small" effect="plain">
+                  {{ item.badgeLabel }}
+                </el-tag>
+              </div>
               <span class="budget-item__total">{{ formatAmount(item.budgetAmount) }}</span>
             </div>
             <div class="budget-item__progress">
@@ -225,7 +309,20 @@ function getStatusColor(status: string) {
 }
 
 .budget-list {
-  // header removed
+  &__sort {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: $spacing-sm $spacing-md;
+    margin-bottom: $spacing-sm;
+    background: $color-bg;
+    border-radius: $radius-lg;
+    &--method {
+      display: flex;
+      gap: $spacing-md;
+      align-items: center;
+    }
+  }
 }
 
 .loading, .empty {
@@ -269,6 +366,31 @@ function getStatusColor(status: string) {
   border-radius: $radius-lg;
 }
 
+.sort-btn {
+  padding: 4px 12px;
+  border: none;
+  background: transparent;
+  color: $color-text-secondary;
+  font-size: $font-size-sm;
+  cursor: pointer;
+  border-radius: $radius-sm;
+  transition: all 0.2s;
+
+  &.active {
+    background: $color-primary;
+    color: white;
+  }
+
+  &--order {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+}
+
 .budget-item {
   padding: $spacing-md;
   background: $color-bg;
@@ -302,6 +424,13 @@ function getStatusColor(status: string) {
     font-size: $font-size-sm;
     font-weight: $font-weight-semibold;
     color: $color-text-primary;
+  }
+
+  &__badges {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    margin-right: 10px;
   }
 
   &__progress {

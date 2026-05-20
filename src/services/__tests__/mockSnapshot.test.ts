@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 // Mock Firebase
 vi.mock('firebase/firestore', () => {
   const mockSetDoc = vi.fn().mockResolvedValue(undefined)
+  const mockAddDoc = vi.fn().mockResolvedValue({ id: 'snapshot123' })
   const mockGetDoc = vi.fn().mockResolvedValue({
     exists: () => true,
     id: '2026-04',
@@ -20,11 +21,17 @@ vi.mock('firebase/firestore', () => {
 
   return {
     setDoc: mockSetDoc,
+    addDoc: mockAddDoc,
     doc: vi.fn().mockReturnValue('docRef'),
     collection: vi.fn().mockReturnValue('collectionRef'),
     Timestamp: { now: () => 'mock-timestamp' },
     getFirestore: vi.fn(),
     getDoc: mockGetDoc,
+    getDocs: vi.fn().mockResolvedValue({ empty: true, docs: [] }),
+    query: vi.fn(),
+    where: vi.fn(),
+    orderBy: vi.fn(),
+    limit: vi.fn(),
   }
 })
 
@@ -42,13 +49,13 @@ vi.mock('firebase/messaging', () => ({
 }))
 
 import { seedFakeSnapshot } from '@/services/mockSnapshot'
-import { setDoc } from 'firebase/firestore'
+import { addDoc } from 'firebase/firestore'
 
 describe('seedFakeSnapshot', () => {
-  it('生成3月和4月的假快照数据', async () => {
+  it('生成3月、4月和5月的假快照数据', async () => {
     await seedFakeSnapshot('user1')
 
-    // 验证调用了两次 setDoc
-    expect(setDoc).toHaveBeenCalledTimes(2)
+    // 验证调用了三次 addDoc
+    expect(addDoc).toHaveBeenCalledTimes(3)
   })
 })

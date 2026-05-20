@@ -157,11 +157,11 @@ function handleSelect(item: IconItem) {
     border-radius: $radius-lg;
     border: 2px solid transparent;
     transition: all 0.2s;
-    filter: grayscale(100%);
+    filter: grayscale(70%);
     opacity: 0.6;
 
     &.active {
-      border-color: $color-primary;
+      /* border-color: $color-primary;*/
       background: rgba($color-primary, 0.05);
       filter: none;
       opacity: 1;

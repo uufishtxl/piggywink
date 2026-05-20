@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, nextTick } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { Edit } from '@element-plus/icons-vue'
 
 interface Props {
@@ -28,6 +28,16 @@ const editing = ref(false)
 const saving = ref(false)
 const editAmount = ref<number | string>(0)
 const editInputRef = ref<HTMLInputElement | null>(null)
+
+// 计算本月已过去比例
+const monthProgress = computed(() => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const today = now.getDate()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  return Math.round((today / daysInMonth) * 100)
+})
 
 function formatAmount(amount: number) {
   return amount.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })
@@ -110,6 +120,12 @@ function saveEdit() {
         ></div>
       </div>
       <span class="progress-bar__label">{{ percentage }}%</span>
+    </div>
+
+    <!-- 本月进度 -->
+    <div class="budget-summary__month-progress">
+      <span class="budget-summary__month-progress-label">本月已过去</span>
+      <span class="budget-summary__month-progress-value">{{ monthProgress }}%</span>
     </div>
 
     <!-- 统计行 -->
@@ -212,6 +228,25 @@ function saveEdit() {
 
   &__stat-value {
     font-size: $font-size-sm;
+    font-weight: $font-weight-semibold;
+    color: $color-text-primary;
+  }
+
+  &__month-progress {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: $spacing-xs;
+    margin-bottom: $spacing-lg;
+    font-size: $font-size-xs;
+    color: $color-text-secondary;
+  }
+
+  &__month-progress-label {
+    // 使用继承样式
+  }
+
+  &__month-progress-value {
     font-weight: $font-weight-semibold;
     color: $color-text-primary;
   }
